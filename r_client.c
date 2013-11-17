@@ -57,7 +57,7 @@ int main(int argc, char** args)
 	struct sockaddr_in server;
 	memset(&server, 0, sizeof(struct sockaddr_in));
 	server.sin_family = AF_INET;
-	server.sin_port = htons((int)args[2]);
+	server.sin_port = htons(*(int *)args[2]);
 	inet_aton("127.0.0.1", &server.sin_addr);
 
 	shutdown(sock, 2);

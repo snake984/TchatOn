@@ -5,6 +5,9 @@
 #include <unistd.h>
 #include <arpa/inet.h>
 #include <pthread.h>
+#include <ifaddrs.h>
+#include <netdb.h>
+
 
 #define IP 127.0.0.1
 
@@ -23,12 +26,51 @@ int main (int argc, char *argv []) {
 	addr.sin_addr.s_addr = htonl(INADDR_ANY);
 	addr.sin_family = AF_INET;
 	addr.sin_port = htons(0);
+	socklen_t sock_len = sizeof addr;
 	
 
-	if (bind (sock, (struct sockaddr*) &addr, sizeof addr) == -1) {
+	if (bind (sock, (struct sockaddr*) &addr, sock_len) == -1) {
 		perror ("Couldn't bind the socket\n");
 		exit (-1);
 	}
+
+
+	// GET PORT
+	if (getsockname(sock, (struct sockaddr *)&addr, &sock_len) == -1) {
+    		perror("getsockname");
+	}
+	else {
+	    printf("\t port: %d\n", ntohs(addr.sin_port));
+	}
+
+	struct ifaddrs *ifa, *ifaddr;
+	if (getifaddrs(&ifaddr) == -1) {
+		perror ("getifaddrs");
+		exit (-1);
+	}
+
+	// GET IP ADDR
+	int s, family;
+	char host [100];
+	ifa = ifaddr;
+         while (ifa != NULL) {
+               if (ifa->ifa_addr == NULL)
+                   continue;
+
+               family = ifa->ifa_addr->sa_family;
+
+               if (family == AF_INET) {
+                   s = getnameinfo(ifa->ifa_addr,
+                       sizeof(struct sockaddr_in),
+                       host, NI_MAXHOST, NULL, 0, NI_NUMERICHOST);
+                   if (s != 0) {
+                       printf("getnameinfo() failed: %s\n", gai_strerror(s));
+                       exit(-1);
+                   }
+                   printf("\t@IP: %s\n", host);
+               }
+		ifa = ifa->ifa_next;
+           }
 
 
 	if(listen(sock, 5) == -1)
