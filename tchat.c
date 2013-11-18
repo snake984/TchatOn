@@ -13,7 +13,7 @@
 
 
 void *client (void *arg);
-void print_ip ();
+void print_ip (char ip []);
 int create_msg_queue ();
 void read_msg (int msqid);
 void write_msg (int msqid, char msg []);
@@ -27,8 +27,11 @@ int main (int argc, char *argv []) {
 		exit (-1);
 	}
 
-	struct sockaddr_in addr = {0};
-	addr.sin_addr.s_addr = htonl(INADDR_ANY);
+	char ip [50];
+	print_ip (ip);
+
+	struct sockaddr_in addr;
+	inet_aton(ip, &addr.sin_addr);
 	addr.sin_family = AF_INET;
 	addr.sin_port = htons(0);
 	socklen_t sock_len = sizeof addr;
@@ -58,11 +61,9 @@ int main (int argc, char *argv []) {
 	    printf("\tport: %d\n", ntohs(addr.sin_port));
 	}
 
-	print_ip ();
-
-	int test = create_msg_queue ();
-	write_msg (test, "Coucou\n");
-	read_msg(test);
+//	int test = create_msg_queue ();
+//	write_msg (test, "Coucou\n");
+//	read_msg(test);
 
 	int c_sock;
 	struct sockaddr_in c_addr = {0};
@@ -133,10 +134,9 @@ void *client (void *arg) {
 	return NULL;
 }
 
-void print_ip () {
+void print_ip (char host []) {
 
 	int s, family;
-	char host [100];
 	struct ifaddrs *ifa, *ifaddr;
 
 
@@ -163,7 +163,10 @@ void print_ip () {
                        printf("getnameinfo() failed: %s\n", gai_strerror(s));
                        exit(-1);
                    }
-                   printf("\t@IP: %s\n", host);
+		   if (strcmp (host, "127.0.0.1"))
+		   {
+	                   printf("\t@IP: %s\n", host);
+		   }
                }
 		ifa = ifa->ifa_next;
            }
@@ -185,7 +188,8 @@ int create_msg_queue () {
 
 void write_msg (int msqid, char msg []) {
 
-	if (msgsnd(msqid, msg, sizeof msg, 0) == -1)
+	int lent = sizeof msg;
+	if (msgsnd(msqid, msg, lent, 0) == -1)
 	{
 		perror ("msgsnd");
 		exit (-1);

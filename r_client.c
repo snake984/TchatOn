@@ -25,9 +25,10 @@ int main(int argc, char** args)
 	int sock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
 
 	//Définition du serveur
-	struct sockaddr_in server = {0};
+
+	struct sockaddr_in server;
 	server.sin_family = AF_INET;
-	server.sin_port = htons(atoi(args[2]));
+	server.sin_port = htons(atoi (args[2]));
 	inet_aton(args[1], &server.sin_addr);
 
 	//On se connecte au serveur
