@@ -43,13 +43,18 @@ int main(int argc, char** args)
 	//On attend un message de la part du serveur
 	char buffer[50];
 
-	
-	while(1)
+	if (send(sock, "R\n", 10, 0) == -1)
 	{
-		int i;
-		if((i = recv(sock, buffer, sizeof(buffer), 0)) != -1)
-		printf("buffer = %s et i = %d\n", buffer, i);
+		perror ("send");
+		exit (-1);
 	}
+	
+//	while(1)
+//	{
+		int i;
+		if((i = recv(sock, buffer, sizeof buffer, 0)) != -1)
+		printf("buffer = %s et i = %d\n", buffer, i);
+//	}
 	//else { perror("listen"); return 1; }
 		
 	close(sock);

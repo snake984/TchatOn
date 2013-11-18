@@ -66,26 +66,29 @@ int main (int argc, char *argv []) {
 //	read_msg(test);
 
 	int c_sock;
-	struct sockaddr_in c_addr = {0};
-	socklen_t c_addr_size = sizeof c_addr;
-	
-	if ((c_sock = accept(sock, (struct sockaddr *) &c_addr,
-			     &c_addr_size))
-		 == -1)
-	{
-		perror ("accept\n");
-		exit (-1);
-	}
-	else
-	{
-		pthread_t *t = malloc (sizeof (pthread_t));
 
-		if (pthread_create(t, NULL, &client,
-				   (void *) &c_sock) 
-			!= 0) 
+	while (1) {
+		struct sockaddr_in c_addr;
+		socklen_t c_addr_size = sizeof c_addr;
+	
+		if ((c_sock = accept(sock, (struct sockaddr *) &c_addr,
+				     &c_addr_size))
+			 == -1)
 		{
-			perror ("pthread_create");
+			perror ("accept\n");
 			exit (-1);
+		}
+		else
+		{
+			pthread_t *t = malloc (sizeof (pthread_t));
+
+			if (pthread_create(t, NULL, &client,
+					   (void *) &c_sock) 
+				!= 0) 
+			{
+				perror ("pthread_create");
+				exit (-1);
+			}
 		}
 	}
 
@@ -98,20 +101,26 @@ void *client (void *arg) {
 
 	int sock = *((int*)arg);
 
-	char msg [50];
+	char msg [] = "Hello\n";
 
 	printf ("Client connected\n");
-	if (send(sock, "Hello\n", 10, 0) == -1)
+	if (send(sock, msg, sizeof msg, 0) == -1)
 	{
 		perror ("send");
 		exit (-1);
 	}
 
-	if (recv(sock, msg, sizeof msg, 0))
+int i;
+if((i = recv(sock, msg, sizeof msg, 0)) != -1)
+printf("buffer = %s et i = %d\n", msg, i);
+
+/*	if (recv(sock, msg, sizeof msg, 0))
 	{
 		perror ("recv");
 		exit (-1);
 	}
+*/
+	printf ("%s", msg);
 
 	if (strcmp (msg, "W"))
 	{
@@ -127,8 +136,7 @@ void *client (void *arg) {
 		exit (-1);
 	}
 
-	printf ("%s", msg);
-
+	printf ("Client disconnected\n");
 	close (sock);
 
 	return NULL;
