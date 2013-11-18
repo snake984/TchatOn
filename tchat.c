@@ -9,6 +9,7 @@
 #include <netdb.h>
 #include <sys/ipc.h>
 #include <sys/msg.h>
+#include <string.h>
 
 
 void *client (void *arg);
@@ -95,6 +96,7 @@ int main (int argc, char *argv []) {
 void *client (void *arg) {
 
 	int sock = *((int*)arg);
+
 	char msg [50];
 
 	printf ("Client connected\n");
