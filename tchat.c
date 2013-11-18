@@ -93,6 +93,7 @@ create_msg_queue ();
 void *client (void *arg) {
 
 	int sock = *((int*)arg);
+	printf("Client connected\n");
 	if (send(sock, "Hello", 10, 0) == -1)
 	{
 		perror ("Couldn't send the message\n");
