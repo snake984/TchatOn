@@ -66,7 +66,7 @@ struct hostent *hostinfo = gethostbyname (args[1]);
 	printf("Trying to connect to %s %s\n", args[1], args[2]);
 	if(connect(sock, (struct sockaddr*)&server, sizeof(server)) == -1) {
 		perror("connect");
-		shutdown(sock, 2);
+		close(sock);
 		exit (-1);
 	}
 	else printf("Connection succeed\n");
