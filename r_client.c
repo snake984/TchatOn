@@ -51,15 +51,41 @@ int main(int argc, char** args)
 		perror("bind");
 		exit(1);
 	}
-	else printf("Success !\n");
+	else printf("Bind success\n");
 
 	//Définition du serveur
 	struct sockaddr_in server;
 	memset(&server, 0, sizeof(struct sockaddr_in));
 	server.sin_family = AF_INET;
 	server.sin_port = htons(*(int *)args[2]);
-	inet_aton("127.0.0.1", &server.sin_addr);
+	inet_aton(args[1], &server.sin_addr);
 
+	//On se connecte au serveur
+	printf("Trying to connect to %s %s\n", args[1], args[2]);
+	if(connect(sock, (struct sockaddr*)&addr, sizeof(struct sockaddr_in)) == -1) {
+		printf("Failed to connect\n");
+		return 1;
+		shutdown(sock, 2);
+	}
+	else printf("Connection succeed\n");
+
+	//On attend un message de la part du serveur
+	char* buffer = NULL;
+	
+	if(listen(sock, 5) == 0)
+	while(1)
+	{
+		int new;
+		struct sockaddr_in servaddr;
+		socklen_t len;
+		new = accept(sock, (struct sockaddr*)&servaddr, &len);
+
+		recvfrom(new, buffer, 140, MSG_WAITALL, (struct sockaddr*)&servaddr, &len);
+		printf("buffer = %s\n", buffer);
+
+	}
+	else printf("Listening aborted\n");
+		
 	shutdown(sock, 2);
 
 	
