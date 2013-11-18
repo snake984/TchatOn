@@ -7,18 +7,22 @@
 #include <pthread.h>
 #include <ifaddrs.h>
 #include <netdb.h>
+#include <sys/ipc.h>
+#include <sys/msg.h>
 
-
-#define IP 127.0.0.1
 
 void *client (void *arg);
+void print_ip ();
+int create_msg_queue ();
+void read_msg (int msqid);
+void write_msg (int msqid);
 
 int main (int argc, char *argv []) {
 
 	int sock=-1;
 
 	if ((sock = socket (AF_INET, SOCK_STREAM, 0)) == -1) {
-		perror ("Couldn't initialize the socket\n");
+		perror ("socket");
 		exit (-1);
 	}
 
@@ -30,30 +34,93 @@ int main (int argc, char *argv []) {
 	
 
 	if (bind (sock, (struct sockaddr*) &addr, sock_len) == -1) {
-		perror ("Couldn't bind the socket\n");
+		perror ("bind");
 		exit (-1);
 	}
 
+	if(listen(sock, 5) == -1)
+	{
+	    perror("Couldn't initialize the max connection\n");
+	    exit(-1);
+	}
 
-	// GET PORT
-	if (getsockname(sock, (struct sockaddr *)&addr, &sock_len) == -1) {
+
+
+	// Print port
+	if (getsockname(sock, (struct sockaddr *)&addr, &sock_len)
+		== -1)
+	{
     		perror("getsockname");
 	}
-	else {
-	    printf("\t port: %d\n", ntohs(addr.sin_port));
+	else
+	{
+	    printf("\tport: %d\n", ntohs(addr.sin_port));
 	}
 
+	print_ip ();
+create_msg_queue ();
+
+
+	int c_sock;
+	struct sockaddr_in c_addr = {0};
+	socklen_t c_addr_size = sizeof c_addr;
+	
+	if ((c_sock = accept(sock, (struct sockaddr *) &c_addr,
+			     &c_addr_size))
+		 == -1)
+	{
+		perror ("accept\n");
+		exit (-1);
+	}
+	else
+	{
+		pthread_t *t = malloc (sizeof (pthread_t));
+
+		if (pthread_create(t, NULL, &client,
+				   (void *) &c_sock) 
+			!= 0) 
+		{
+			perror ("Couldn't initialize thread\n");
+			exit (-1);
+		}
+	}
+
+	close (sock);
+
+	return 0;
+}
+
+void *client (void *arg) {
+
+	int sock = *((int*)arg);
+	if (send(sock, "Hello", 10, 0) == -1)
+	{
+		perror ("Couldn't send the message\n");
+		exit (-1);
+	}
+
+	close (sock);
+
+	return NULL;
+}
+
+void print_ip () {
+
+	int s, family;
+	char host [100];
 	struct ifaddrs *ifa, *ifaddr;
-	if (getifaddrs(&ifaddr) == -1) {
+
+
+	if (getifaddrs(&ifaddr) == -1)
+	{
 		perror ("getifaddrs");
 		exit (-1);
 	}
 
-	// GET IP ADDR
-	int s, family;
-	char host [100];
+
 	ifa = ifaddr;
-         while (ifa != NULL) {
+         while (ifa != NULL)
+	{
                if (ifa->ifa_addr == NULL)
                    continue;
 
@@ -71,44 +138,40 @@ int main (int argc, char *argv []) {
                }
 		ifa = ifa->ifa_next;
            }
-
-
-	if(listen(sock, 5) == -1)
-	{
-	    perror("Couldn't initialize the max connection\n");
-	    exit(-1);
-	}
-
-
-	int c_sock;
-	struct sockaddr_in c_addr = {0};
-	socklen_t c_addr_size = sizeof c_addr;
-	
-	if ((c_sock = accept(sock, (struct sockaddr *) &c_addr, &c_addr_size)) == -1) {
-		perror ("Couldn't accept the client\n");
-		exit (-1);
-	}
-	else {
-		pthread_t *t = malloc (sizeof (pthread_t));
-		if (pthread_create(t, NULL, &client, (void *) &c_sock) != 0) {
-			perror ("Couldn't initialize thread\n");
-			exit (-1);
-		}
-	}
-
-	close (sock);
-
-	return 0;
 }
 
-void *client (void *arg) {
+int create_msg_queue () {
 
-	int sock = *((int*)arg);
-	if (send(sock, "Hello", 10, 0) == -1) {
-		perror ("Couldn't send the message\n");
+	int msqid = -1;
+	key_t key = 1;
+
+	if ((msqid = msgget(ftok ("/tmp", key), IPC_CREAT)) == -1)
+	{
+		perror ("msgget");
 		exit (-1);
 	}
-	close (sock);
 
-	return NULL;
+	return msqid;
+}
+
+void write_msg (int msqid) {
+
+	char message [50];
+	if (msgsnd(msqid, message, sizeof message, 0) == -1)
+	{
+		perror ("msgsnd");
+		exit (-1);
+	}
+}
+
+void read_msg (int msqid) {
+
+	char message [50];
+	if (msgrcv(msqid, message, sizeof message, 0, MSG_NOERROR) == -1)
+	{
+		perror ("msgrcv");
+		exit (-1);
+	}
+
+	printf ("%s", message);
 }
