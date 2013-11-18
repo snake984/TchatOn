@@ -40,31 +40,27 @@ int main(int argc, char** args)
 	}
 	else printf("Connection succeed\n");
 
-	//On attend un message de la part du serveur
 
-	if (send(sock, "R", 10, 0) == -1)
+	if (send(sock, "W", 10, 0) == -1)
 	{
 		perror ("send");
 		exit (-1);
 	}
 
-	char buffer[50];
-	int i;
-
+	char buffer [50];
 	while(1)
 	{
-		if((i = recv(sock, buffer, sizeof buffer, 0)) == -1)
-		{
-			printf ("Server disconnected\n");
+		fgets (buffer, sizeof buffer, stdin);
+
+		if (strcmp (buffer, "exit\n") == 0) {
 			break;
 		}
 
-		if (i==0)
+		if(send(sock, buffer, sizeof buffer, 0) == -1)
 		{
-			break;
+			perror ("send");
+			exit (-1);
 		}
-
-printf("%s", buffer);
 	}
 		
 	close(sock);

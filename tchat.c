@@ -11,12 +11,23 @@
 #include <sys/msg.h>
 #include <string.h>
 
+struct message {
+	long type;
+	char buffer [50];
+}message;
+
 
 void *client (void *arg);
 void print_ip (char ip []);
 int create_msg_queue ();
-void read_msg (int msqid);
-void write_msg (int msqid, char msg []);
+struct message read_msg (int msgqid);
+void write_msg (int msgqid, struct message msg);
+void c_reader (int sock);
+void c_writer (int sock);
+
+int KEY = 1;
+int MSGQID = -1;
+
 
 int main (int argc, char *argv []) {
 
@@ -31,7 +42,7 @@ int main (int argc, char *argv []) {
 	print_ip (ip);
 
 	struct sockaddr_in addr;
-	inet_aton(ip, &addr.sin_addr);
+	inet_aton("127.0.0.1", &addr.sin_addr);
 	addr.sin_family = AF_INET;
 	addr.sin_port = htons(0);
 	socklen_t sock_len = sizeof addr;
@@ -61,12 +72,10 @@ int main (int argc, char *argv []) {
 	    printf("\tport: %d\n", ntohs(addr.sin_port));
 	}
 
-//	int test = create_msg_queue ();
-//	write_msg (test, "Coucou\n");
-//	read_msg(test);
+	MSGQID = create_msg_queue ();
 
-	int c_sock;
 
+	int c_sock = -1;
 	while (1) {
 		struct sockaddr_in c_addr;
 		socklen_t c_addr_size = sizeof c_addr;
@@ -100,35 +109,24 @@ int main (int argc, char *argv []) {
 void *client (void *arg) {
 
 	int sock = *((int*)arg);
+	char msg [50];
 
-	char msg [] = "Hello\n";
-
-	printf ("Client connected\n");
-	if (send(sock, msg, sizeof msg, 0) == -1)
-	{
-		perror ("send");
-		exit (-1);
-	}
-
-int i;
-if((i = recv(sock, msg, sizeof msg, 0)) != -1)
-printf("buffer = %s et i = %d\n", msg, i);
-
-/*	if (recv(sock, msg, sizeof msg, 0))
+	if (recv(sock, msg, sizeof msg, 0) == -1)
 	{
 		perror ("recv");
 		exit (-1);
 	}
-*/
-	printf ("%s", msg);
 
-	if (strcmp (msg, "W"))
+	if (strcmp (msg, "W") == 0)
 	{
-
+		printf ("Writer connected\n");
+		c_writer (sock);
 	}
-	else if (strcmp (msg, "R"))
+	else if (strcmp (msg, "R") == 0)
 	{
-
+		printf ("Reader connected\n");
+		KEY++;
+		c_reader (sock);
 	}
 	else
 	{
@@ -136,7 +134,6 @@ printf("buffer = %s et i = %d\n", msg, i);
 		exit (-1);
 	}
 
-	printf ("Client disconnected\n");
 	close (sock);
 
 	return NULL;
@@ -182,36 +179,79 @@ void print_ip (char host []) {
 
 int create_msg_queue () {
 
-	int msqid = -1;
-	key_t key = 1;
+	int msgqid = -1;
+	key_t key = KEY;
 
-	if ((msqid = msgget(ftok ("/tmp", key), IPC_CREAT)) == -1)
+	if ((msgqid = msgget(ftok ("/tmp", key), IPC_CREAT)) == -1)
 	{
 		perror ("msgget");
 		exit (-1);
 	}
 
-	return msqid;
+	return msgqid;
 }
 
-void write_msg (int msqid, char msg []) {
+void write_msg (int msgqid, struct message msg) {
 
-	int lent = sizeof msg;
-	if (msgsnd(msqid, msg, lent, 0) == -1)
+	if (msgsnd(msgqid, msg.buffer, sizeof msg.buffer, 0) == -1)
 	{
 		perror ("msgsnd");
 		exit (-1);
 	}
 }
 
-void read_msg (int msqid) {
+struct message read_msg (int msgqid) {
 
-	char message [50];
-	if (msgrcv(msqid, message, sizeof message, 0, MSG_NOERROR) == -1)
+	struct message msg;
+printf ("size : %ld\n", sizeof msg.buffer);
+	if (msgrcv(msgqid, msg.buffer, sizeof msg.buffer, msg.type, MSG_NOERROR) == -1)
 	{
 		perror ("msgrcv");
 		exit (-1);
 	}
 
-	printf ("%s", message);
+	return message;
+}
+
+void c_reader (int sock) {
+
+//	int msgqid = create_msg_queue();
+
+	struct message msg;
+
+	while (1) {
+printf("%d\n", sock);
+		msg = read_msg (MSGQID);
+printf ("msg : %s socket : %d\n", msg.buffer, sock);
+		if (send(sock, msg.buffer, sizeof msg.buffer, 0) == -1)
+		{
+			perror ("send");
+			exit (-1);
+		}
+	}
+}
+
+void c_writer (int sock) {
+printf("%d\n", sock);
+	struct message msg;
+	int i;
+
+	while(1)
+	{
+		if((i = recv(sock, msg.buffer, sizeof msg.buffer, 0)) == -1)
+		{
+			printf ("Writer disconnected\n");
+			return;
+		}
+
+		if (i==0)
+		{
+			break;
+		}
+
+		message.type = 0;
+printf("%s", msg.buffer);
+
+		write_msg (MSGQID, msg);
+	}	
 }
