@@ -9,13 +9,14 @@
 #include <netdb.h>
 #include <sys/ipc.h>
 #include <sys/msg.h>
+#include <string.h>
 
 
 void *client (void *arg);
 void print_ip ();
 int create_msg_queue ();
 void read_msg (int msqid);
-void write_msg (int msqid);
+void write_msg (int msqid, char msg []);
 
 int main (int argc, char *argv []) {
 
@@ -58,8 +59,10 @@ int main (int argc, char *argv []) {
 	}
 
 	print_ip ();
-create_msg_queue ();
 
+	int test = create_msg_queue ();
+	write_msg (test, "Coucou\n");
+	read_msg(test);
 
 	int c_sock;
 	struct sockaddr_in c_addr = {0};
@@ -80,7 +83,7 @@ create_msg_queue ();
 				   (void *) &c_sock) 
 			!= 0) 
 		{
-			perror ("Couldn't initialize thread\n");
+			perror ("pthread_create");
 			exit (-1);
 		}
 	}
@@ -93,12 +96,37 @@ create_msg_queue ();
 void *client (void *arg) {
 
 	int sock = *((int*)arg);
-	printf("Client connected\n");
-	if (send(sock, "Hello", 10, 0) == -1)
+
+	char msg [50];
+
+	printf ("Client connected\n");
+	if (send(sock, "Hello\n", 10, 0) == -1)
 	{
-		perror ("Couldn't send the message\n");
+		perror ("send");
 		exit (-1);
 	}
+
+	if (recv(sock, msg, sizeof msg, 0))
+	{
+		perror ("recv");
+		exit (-1);
+	}
+
+	if (strcmp (msg, "W"))
+	{
+
+	}
+	else if (strcmp (msg, "R"))
+	{
+
+	}
+	else
+	{
+		printf ("Couldn't reconize client type\n");
+		exit (-1);
+	}
+
+	printf ("%s", msg);
 
 	close (sock);
 
@@ -155,10 +183,9 @@ int create_msg_queue () {
 	return msqid;
 }
 
-void write_msg (int msqid) {
+void write_msg (int msqid, char msg []) {
 
-	char message [50];
-	if (msgsnd(msqid, message, sizeof message, 0) == -1)
+	if (msgsnd(msqid, msg, sizeof msg, 0) == -1)
 	{
 		perror ("msgsnd");
 		exit (-1);
