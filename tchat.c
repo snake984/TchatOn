@@ -27,8 +27,11 @@ int main (int argc, char *argv []) {
 		exit (-1);
 	}
 
-	struct sockaddr_in addr = {0};
-	addr.sin_addr.s_addr = htonl(INADDR_ANY);
+	struct sockaddr_in addr;
+	//addr.sin_addr.s_addr = INADDR_ANY;
+inet_aton("127.0.0.1", &addr.sin_addr);
+printf ("%d\n", addr.sin_addr.s_addr);
+	//inet_aton("127.0.0.1", &addr.sin_addr);
 	addr.sin_family = AF_INET;
 	addr.sin_port = htons(0);
 	socklen_t sock_len = sizeof addr;
@@ -185,7 +188,8 @@ int create_msg_queue () {
 
 void write_msg (int msqid, char msg []) {
 
-	if (msgsnd(msqid, msg, sizeof msg, 0) == -1)
+	int lent = sizeof msg;
+	if (msgsnd(msqid, msg, lent, 0) == -1)
 	{
 		perror ("msgsnd");
 		exit (-1);

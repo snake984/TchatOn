@@ -54,13 +54,10 @@ int main(int argc, char** args)
 	else printf("Bind success\n");
 */
 	//Définition du serveur
-struct hostent *hostinfo = gethostbyname (args[1]);
-	struct sockaddr_in server = {0};
-	//memset(&server, 0, sizeof(struct sockaddr_in));
+	struct sockaddr_in server;
 	server.sin_family = AF_INET;
-	server.sin_port = htons(*(int *)args[2]);
-	server.sin_addr = *(struct in_addr *) hostinfo->h_addr;
-	//inet_aton(args[1], &server.sin_addr);
+	server.sin_port = htons(atoi (args[2]));
+	inet_aton(args[1], &server.sin_addr);
 
 	//On se connecte au serveur
 	printf("Trying to connect to %s %s\n", args[1], args[2]);
