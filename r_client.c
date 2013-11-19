@@ -6,6 +6,9 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <unistd.h>
+#include <signal.h>
+
+void Exit(int sig, int sock);
 
 
 int main(int argc, char** args)
@@ -24,6 +27,11 @@ int main(int argc, char** args)
 
 	int sock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
 
+	//On interprète le signal SIGINT (Ctrl+C)
+	struct sigaction exitAction;
+	exitAction.sa_handler = Exit;
+	sigaction(SIGINT, &exitAction, NULL);
+	
 	//Définition du serveur
 
 	struct sockaddr_in server;
@@ -76,4 +84,17 @@ printf("%s", buffer);
 
 	return 0;
 
+}
+
+void Exit(int sig, int sock)
+{
+	printf("Exit client \n");
+	if(send(sock, "Disconnect", 15, 0) == -1)
+	{
+		perror("send");
+		exit(1);
+	}
+
+	close(sock);
+	exit(0);
 }
