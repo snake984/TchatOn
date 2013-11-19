@@ -42,7 +42,7 @@ int main (int argc, char *argv []) {
 	print_ip (ip);
 
 	struct sockaddr_in addr;
-	inet_aton("127.0.0.1", &addr.sin_addr);
+	inet_aton(ip, &addr.sin_addr);
 	addr.sin_family = AF_INET;
 	addr.sin_port = htons(0);
 	socklen_t sock_len = sizeof addr;
@@ -193,7 +193,7 @@ int create_msg_queue () {
 
 void write_msg (int msgqid, struct message msg) {
 
-	if (msgsnd(msgqid, msg.buffer, sizeof msg.buffer, 0) == -1)
+	if (msgsnd(msgqid, &msg, sizeof msg.buffer, 0) == -1)
 	{
 		perror ("msgsnd");
 		exit (-1);
@@ -204,10 +204,10 @@ struct message read_msg (int msgqid) {
 
 	struct message msg;
 printf ("size : %ld\n", sizeof msg.buffer);
-	if (msgrcv(msgqid, msg.buffer, sizeof msg.buffer, msg.type, MSG_NOERROR) == -1)
+	if (msgrcv(msgqid, &msg, sizeof msg.buffer, msg.type, MSG_NOERROR) == -1)
 	{
 		perror ("msgrcv");
-		exit (-1);
+		exit (2);
 	}
 
 	return message;
@@ -226,7 +226,7 @@ printf ("msg : %s socket : %d\n", msg.buffer, sock);
 		if (send(sock, msg.buffer, sizeof msg.buffer, 0) == -1)
 		{
 			perror ("send");
-			exit (-1);
+			exit (1);
 		}
 	}
 }
