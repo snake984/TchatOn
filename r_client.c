@@ -58,10 +58,15 @@ int main(int argc, char** args)
 			printf ("Server disconnected\n");
 			break;
 		}
-
 		if (i==0)
 		{
 			break;
+		}
+
+		if (send(sock, "Ok", 5, 0) == -1)
+		{
+			perror ("send");
+			exit (1);
 		}
 
 printf("%s", buffer);

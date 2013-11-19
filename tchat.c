@@ -20,13 +20,17 @@ struct message {
 void *client (void *arg);
 void print_ip (char ip []);
 int create_msg_queue ();
-struct message read_msg (int msgqid);
+struct message read_msg (int msgqid, int num_r);
 void write_msg (int msgqid, struct message msg);
-void c_reader (int sock);
+void c_reader (int sock, int num_r);
 void c_writer (int sock);
 
 int KEY = 1;
 int MSGQID = -1;
+int NB_R = 0;
+int NB_R_MAX = 5;
+int NB_W_MAX = 3;
+int TAB_R_CONNECTED [NB_R_MAX];
 
 
 int main (int argc, char *argv []) {
@@ -42,7 +46,7 @@ int main (int argc, char *argv []) {
 	print_ip (ip);
 
 	struct sockaddr_in addr;
-	inet_aton(ip, &addr.sin_addr);
+	inet_aton("127.0.0.1", &addr.sin_addr);
 	addr.sin_family = AF_INET;
 	addr.sin_port = htons(0);
 	socklen_t sock_len = sizeof addr;
@@ -53,10 +57,10 @@ int main (int argc, char *argv []) {
 		exit (-1);
 	}
 
-	if(listen(sock, 5) == -1)
+	if(listen(sock, (NB_R_MAX + NB_W_MAX)) == -1)
 	{
-	    perror("Couldn't initialize the max connection\n");
-	    exit(-1);
+	    perror("listen");
+	    exit(1);
 	}
 
 
@@ -85,7 +89,7 @@ int main (int argc, char *argv []) {
 			 == -1)
 		{
 			perror ("accept\n");
-			exit (-1);
+			exit (1);
 		}
 		else
 		{
@@ -96,9 +100,10 @@ int main (int argc, char *argv []) {
 				!= 0) 
 			{
 				perror ("pthread_create");
-				exit (-1);
+				exit (1);
 			}
 		}
+printf ("Client trying to connect...\n");
 	}
 
 	close (sock);
@@ -124,9 +129,9 @@ void *client (void *arg) {
 	}
 	else if (strcmp (msg, "R") == 0)
 	{
-		printf ("Reader connected\n");
-		KEY++;
-		c_reader (sock);
+		NB_R++;
+		printf ("Reader %d connected\n", NB_R);
+		c_reader (sock, NB_R);
 	}
 	else
 	{
@@ -193,18 +198,20 @@ int create_msg_queue () {
 
 void write_msg (int msgqid, struct message msg) {
 
+printf ("Message writing : %sType : %ld\n", msg.buffer, msg.type);
 	if (msgsnd(msgqid, &msg, sizeof msg.buffer, 0) == -1)
 	{
 		perror ("msgsnd");
 		exit (-1);
 	}
+printf ("Done !\n");
 }
 
-struct message read_msg (int msgqid) {
+struct message read_msg (int msgqid, int num_r) {
 
 	struct message msg;
-printf ("size : %ld\n", sizeof msg.buffer);
-	if (msgrcv(msgqid, &msg, sizeof msg.buffer, msg.type, MSG_NOERROR) == -1)
+printf ("Sending message to client\n");
+	if (msgrcv(msgqid, &msg, sizeof msg.buffer, num_r, 0) == -1)
 	{
 		perror ("msgrcv");
 		exit (2);
@@ -213,45 +220,65 @@ printf ("size : %ld\n", sizeof msg.buffer);
 	return msg;
 }
 
-void c_reader (int sock) {
-
-//	int msgqid = create_msg_queue();
+void c_reader (int sock, int num_r) {
 
 	struct message msg;
+	int test;
 
 	while (1) {
-printf("%d\n", sock);
-		msg = read_msg (MSGQID);
-printf ("msg : %s socket : %d\n", msg.buffer, sock);
+		msg = read_msg (MSGQID, num_r);
+
 		if (send(sock, msg.buffer, sizeof msg.buffer, 0) == -1)
 		{
 			perror ("send");
 			exit (1);
 		}
+
+		if(recv(sock, msg.buffer, sizeof msg.buffer, 0) == -1)
+		{
+			printf ("Reader disconnected\n");
+			return;
+		}
+
+		if (strcmp(msg.buffer, "Ok") == 0)
+		{
+			
+		}
+		else
+		{
+			printf ("Reader disconnected\n");
+		}
 	}
 }
 
 void c_writer (int sock) {
-printf("%d\n", sock);
+
 	struct message msg;
-	int i;
+	int test, i;
 
 	while(1)
 	{
-		if((i = recv(sock, msg.buffer, sizeof msg.buffer, 0)) == -1)
+		if((test = recv(sock, msg.buffer, sizeof msg.buffer, 0)) == -1)
 		{
 			printf ("Writer disconnected\n");
 			return;
 		}
 
-		if (i==0)
+		if (test==0)
 		{
 			break;
 		}
 
-		message.type = 0;
-printf("%s", msg.buffer);
+//printf ("Message received : %s", msg.buffer);
 
-		write_msg (MSGQID, msg);
+		if (NB_R == 0)
+		{
+			printf ("No client connected\n");
+		}
+
+		for (i=1; i<=NB_R; i++) {
+			msg.type = i;
+			write_msg (MSGQID, msg);
+		}
 	}	
 }
