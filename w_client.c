@@ -22,6 +22,12 @@ int main(int argc, char** args)
 		return 0;
 	}
 
+	if(args[3] == NULL)
+	{
+		printf("You must enter a pseudo\n");
+		return 0;
+	}
+
 	int sock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
 
 	//Définition du serveur
@@ -40,8 +46,10 @@ int main(int argc, char** args)
 	}
 	else printf("Connection succeed\n");
 
+	char identity [25];
+	sprintf (identity, "W %s", args[3]);
 
-	if (send(sock, "W", 10, 0) == -1)
+	if (send(sock, identity, sizeof identity, 0) == -1)
 	{
 		perror ("send");
 		exit (-1);

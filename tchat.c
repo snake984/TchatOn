@@ -116,26 +116,23 @@ printf ("Client trying to connect...\n");
 void *client (void *arg) {
 
 	int sock = *((int*)arg);
-	char msg [50];
+	char buffer [50];
 
-	if (recv(sock, msg, sizeof msg, 0) == -1)
+	if (recv(sock, buffer, sizeof buffer, 0) == -1)
 	{
 		perror ("recv");
 		exit (-1);
 	}
 
-	if (strcmp (msg, "W") == 0)
+	char *save [1];
+	char *type_client = strtok_r (buffer, " ", save);
+	if (strcmp (type_client, "W") == 0)
 	{
-		if (recv(sock, msg, sizeof msg, 0) == -1)
-		{
-			perror ("recv");
-			exit (-1);
-		}
-
-		printf ("%s connected\n", msg);
-		c_writer (sock, msg);
+		char *pseudo = strtok_r (NULL, " ", save);
+		printf ("%s connected\n", pseudo);
+		c_writer (sock, buffer);
 	}
-	else if (strcmp (msg, "R") == 0)
+	else if (strcmp (type_client, "R") == 0)
 	{
 		int i;
 		for (i=0; i<NB_R_MAX; i++)
@@ -152,7 +149,7 @@ void *client (void *arg) {
 	}
 	else
 	{
-		printf ("Couldn't reconize client type\n");
+		printf ("Couldn't reconize client type : %s\n", type_client);
 		exit (-1);
 	}
 
@@ -255,12 +252,8 @@ void c_reader (int sock, int num_r) {
 			printf ("Reader disconnected\n");
 			return;
 		}
-
-		if (strcmp(msg.buffer, "Ok") == 0)
-		{
-			
-		}
-		else
+printf ("%s\n", msg.buffer);
+		if (strcmp(msg.buffer, "Ok") != 0)
 		{
 			TAB_R_CONNECTED [num_r] = 0;
 			printf ("Reader disconnected\n");
