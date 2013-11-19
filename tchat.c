@@ -144,6 +144,7 @@ void *client (void *arg) {
 			}
 		}
 
+		NB_R++;
 		printf ("Reader %d connected\n", i);
 		c_reader (sock, i);
 	}
@@ -249,10 +250,11 @@ void c_reader (int sock, int num_r) {
 
 		if(recv(sock, msg.buffer, sizeof msg.buffer, 0) == -1)
 		{
+			NB_R--;
 			printf ("Reader disconnected\n");
 			return;
 		}
-printf ("%s\n", msg.buffer);
+printf ("Reader : %s\n", msg.buffer);
 		if (strcmp(msg.buffer, "Ok") != 0)
 		{
 			TAB_R_CONNECTED [num_r] = 0;
