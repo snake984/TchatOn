@@ -8,10 +8,8 @@
 #include <unistd.h>
 #include <signal.h>
 
-int SOCKID = -1;
-
-void Exit(int sig);
-
+void Exit(int);
+int sock;
 
 int main(int argc, char** args)
 {
@@ -27,7 +25,7 @@ int main(int argc, char** args)
 		return 0;
 	}
 
-	SOCKID = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+	 sock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
 
 	//On interprète le signal SIGINT (Ctrl+C)
 	struct sigaction exitAction;
@@ -43,16 +41,16 @@ int main(int argc, char** args)
 
 	//On se connecte au serveur
 	printf("Trying to connect to %s %s\n", args[1], args[2]);
-	if(connect(SOCKID, (struct sockaddr*)&server, sizeof(server)) == -1) {
+	if(connect(sock, (struct sockaddr*)&server, sizeof(server)) == -1) {
 		perror("connect");
-		close(SOCKID);
+		close(sock);
 		exit (-1);
 	}
 	else printf("Connection succeed\n");
 
 	//On attend un message de la part du serveur
 
-	if (send(SOCKID, "R", 10, 0) == -1)
+	if (send(sock, "R", 10, 0) == -1)
 	{
 		perror ("send");
 		exit (-1);
@@ -63,7 +61,7 @@ int main(int argc, char** args)
 
 	while(1)
 	{
-		if((i = recv(SOCKID, buffer, sizeof buffer, 0)) == -1)
+		if((i = recv(sock, buffer, sizeof buffer, 0)) == -1)
 		{
 			printf ("Server disconnected\n");
 			break;
@@ -73,7 +71,7 @@ int main(int argc, char** args)
 			break;
 		}
 
-		if (send(SOCKID, "Ok", 5, 0) == -1)
+		if (send(sock, "Ok", 5, 0) == -1)
 		{
 			perror ("send");
 			exit (1);
@@ -82,7 +80,7 @@ int main(int argc, char** args)
 printf("%s", buffer);
 	}
 		
-	close(SOCKID);
+	close(sock);
 
 	return 0;
 
@@ -90,13 +88,13 @@ printf("%s", buffer);
 
 void Exit(int sig)
 {
-	printf("Exit client %d \n", SOCKID);
-	if(send(SOCKID, "Disconnect", 15, 0) == -1)
+	printf("Exit client %d \n", sock);
+	if(send(sock, "Disconnect", 15, 0) == -1)
 	{
 		perror("send");
 		exit(1);
 	}
 
-	close(SOCKID);
+	close(sock);
 	exit(0);
 }
