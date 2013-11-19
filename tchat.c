@@ -1,41 +1,32 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <unistd.h>
-#include <arpa/inet.h>
-#include <pthread.h>
-#include <ifaddrs.h>
-#include <netdb.h>
-#include <sys/ipc.h>
-#include <sys/msg.h>
-#include <string.h>
+#include "tchat.h"
 
-#define NB_R_MAX 5
-#define NB_W_MAX 3
+int main (int argc, char **args) {
 
-struct message {
-	long type;
-	char buffer [50];
-}message;
+	if (argc == 2 && strcmp (args[1], "-s") == 0)
+	{
+		create_server();
+	}
+	else if (argc == 4 && strcmp (args[1], "-r") == 0)
+	{
+		create_reader (argc, args);
+	}
+	else if (argc == 5 && strcmp (args[1], "-w") == 0)
+	{
+		create_writer (argc, args);
+	}
+	else
+	{
+		printf ("Wrong argument !\n");
+	}
 
+	return 0;
+}
 
-void *client (void *arg);
-void print_ip (char ip []);
-int create_msg_queue ();
-struct message read_msg (int msgqid, int num_r);
-void write_msg (int msgqid, struct message msg);
-void c_reader (int sock, int num_r);
-void c_writer (int sock, char pseudo []);
+int create_server () {
 
-int KEY = 1;
-int MSGQID = -1;
-int NB_R = 0;
-int TAB_R_CONNECTED [NB_R_MAX] = {0};
-
-
-int main (int argc, char *argv []) {
-
+	struct sigaction exitAction;
+	exitAction.sa_handler = exit_server;
+	sigaction(SIGINT, &exitAction, NULL);
 	
 	int sock=-1;
 
@@ -43,6 +34,8 @@ int main (int argc, char *argv []) {
 		perror ("socket");
 		exit (-1);
 	}
+
+	SERVER_SOCKET = sock;
 
 	char ip [50];
 	print_ip (ip);
@@ -90,13 +83,12 @@ int main (int argc, char *argv []) {
 				     &c_addr_size))
 			 == -1)
 		{
-			perror ("accept\n");
+			perror ("accept");
 			exit (1);
 		}
 		else
 		{
 			pthread_t *t = malloc (sizeof (pthread_t));
-
 			if (pthread_create(t, NULL, &client,
 					   (void *) &c_sock) 
 				!= 0) 
@@ -105,7 +97,6 @@ int main (int argc, char *argv []) {
 				exit (1);
 			}
 		}
-printf ("Client trying to connect...\n");
 	}
 
 	close (sock);
@@ -115,8 +106,9 @@ printf ("Client trying to connect...\n");
 
 void *client (void *arg) {
 
+	int i;
 	int sock = *((int*)arg);
-	char buffer [50];
+	char buffer [SIZE_MAX_MSG];
 
 	if (recv(sock, buffer, sizeof buffer, 0) == -1)
 	{
@@ -128,30 +120,100 @@ void *client (void *arg) {
 	char *type_client = strtok_r (buffer, " ", save);
 	if (strcmp (type_client, "W") == 0)
 	{
+		int num_w = -1;
 		char *pseudo = strtok_r (NULL, " ", save);
 		printf ("%s connected\n", pseudo);
-		c_writer (sock, buffer);
+
+		for (i=0; i<NB_W_MAX; i++)
+		{
+			if (TAB_W_PSEUDO [i] != NULL)
+			{
+				if (strcmp (TAB_W_PSEUDO [i], pseudo) == 0)
+				{
+					if (send(sock, "Pseudo already exist\n", 50, 0) == -1)
+					{
+						perror ("send");
+						exit (1);
+					}
+					close (sock);
+					return NULL;
+				}
+			}
+			else
+			{
+				num_w = i;
+			}
+		}
+
+		if (num_w == -1)
+		{
+			if (send(sock, "Too many Writers\n", 50, 0) == -1)
+			{
+				perror ("send");
+				exit (1);
+			}
+		}
+		else
+		{
+			if (send(sock, "Accepted", 50, 0) == -1)
+			{
+				perror ("send");
+				exit (1);
+			}
+
+			CLIENT_SOCKETS [NB_R_MAX + num_w] = sock;
+			TAB_W_PSEUDO [num_w] = pseudo;
+
+			c_writer (sock, pseudo);
+
+			CLIENT_SOCKETS [NB_R_MAX + num_w] = -1;
+			TAB_W_PSEUDO [num_w] = NULL;
+		}
 	}
 	else if (strcmp (type_client, "R") == 0)
 	{
-		int i;
+		int num_r = -1;
+		NB_R++;
+
 		for (i=0; i<NB_R_MAX; i++)
 		{
 			if (TAB_R_CONNECTED [i] == 0)
 			{
+				num_r = i+1;
+				CLIENT_SOCKETS [i] = sock;
 				TAB_R_CONNECTED [i] = 1;
 				break;
 			}
 		}
 
-		NB_R++;
-		printf ("Reader %d connected\n", i);
-		c_reader (sock, i);
+		if (num_r == -1)
+		{
+			if (send(sock, "Too many Readers\n", 50, 0) == -1)
+			{
+				perror ("send");
+				exit (1);
+			}
+		}
+		else
+		{
+			printf ("Reader %d connected\n", num_r);
+			if (send(sock, "Accepted", 50, 0) == -1)
+			{
+				perror ("send");
+				exit (1);
+			}
+			c_reader (sock, num_r);
+		}
 	}
 	else
 	{
+		if (send(sock, "Couldn't reconize client type\n", 50, 0) == -1)
+		{
+			perror ("send");
+			exit (1);
+		}
+
 		printf ("Couldn't reconize client type : %s\n", type_client);
-		exit (-1);
 	}
 
 	close (sock);
@@ -186,7 +248,7 @@ void print_ip (char host []) {
                        host, NI_MAXHOST, NULL, 0, NI_NUMERICHOST);
                    if (s != 0) {
                        printf("getnameinfo() failed: %s\n", gai_strerror(s));
-                       exit(-1);
+                       exit(1);
                    }
 		   if (strcmp (host, "127.0.0.1"))
 		   {
@@ -195,6 +257,7 @@ void print_ip (char host []) {
                }
 		ifa = ifa->ifa_next;
            }
+	free (ifaddr);
 }
 
 int create_msg_queue () {
@@ -202,7 +265,7 @@ int create_msg_queue () {
 	int msgqid = -1;
 	key_t key = KEY;
 
-	if ((msgqid = msgget(ftok ("/tmp", key), IPC_CREAT)) == -1)
+	if ((msgqid = msgget(ftok (".", key), 0666 | IPC_CREAT)) == -1)
 	{
 		perror ("msgget");
 		exit (-1);
@@ -213,19 +276,27 @@ int create_msg_queue () {
 
 void write_msg (int msgqid, struct message msg) {
 
-printf ("Message writing : %sType : %ld\n", msg.buffer, msg.type);
+//printf ("Message writing : %sType : %ld\n", msg.buffer, msg.type);
+	char tmp [SIZE_MAX_MSG] = {'\0'};
+
+	time_t timestamp = time(NULL);
+	struct tm *t = localtime (&timestamp);
+
+	sprintf (tmp, "%02u:%02u:%02u %s a dit : %s", t->tm_hour, t->tm_min, t->tm_sec, msg.pseudo, msg.buffer);
+	strcpy (msg.buffer, tmp);
+
 	if (msgsnd(msgqid, &msg, sizeof msg.buffer, 0) == -1)
 	{
 		perror ("msgsnd");
 		exit (-1);
 	}
-printf ("Done !\n");
+//printf ("Done !\n");
 }
 
 struct message read_msg (int msgqid, int num_r) {
 
 	struct message msg;
-printf ("Sending message to client\n");
+
 	if (msgrcv(msgqid, &msg, sizeof msg.buffer, num_r, 0) == -1)
 	{
 		perror ("msgrcv");
@@ -250,15 +321,18 @@ void c_reader (int sock, int num_r) {
 
 		if(recv(sock, msg.buffer, sizeof msg.buffer, 0) == -1)
 		{
-			NB_R--;
-			printf ("Reader disconnected\n");
+			
+			perror ("R recv");
 			return;
 		}
-printf ("Reader : %s\n", msg.buffer);
+
 		if (strcmp(msg.buffer, "Ok") != 0)
 		{
-			TAB_R_CONNECTED [num_r] = 0;
-			printf ("Reader disconnected\n");
+			TAB_R_CONNECTED [num_r-1] = 0;
+			CLIENT_SOCKETS [num_r-1] = -1;
+			NB_R--;
+			printf ("Reader %d disconnected\n", num_r);
+			return;
 		}
 	}
 }
@@ -272,12 +346,13 @@ void c_writer (int sock, char pseudo []) {
 	{
 		if((test = recv(sock, msg.buffer, sizeof msg.buffer, 0)) == -1)
 		{
-			printf ("Writer disconnected\n");
+			perror ("W recv");
 			return;
 		}
 
 		if (test==0)
 		{
+			printf ("%s disconnected\n", pseudo);
 			break;
 		}
 
@@ -288,9 +363,214 @@ void c_writer (int sock, char pseudo []) {
 			printf ("No client connected\n");
 		}
 
-		for (i=1; i<=NB_R; i++) {
-			msg.type = i;
-			write_msg (MSGQID, msg);
+		for (i=0; i<NB_R_MAX; i++) {
+
+			if (TAB_R_CONNECTED [i])
+			{
+				msg.type = i+1;
+				strcpy (msg.pseudo, pseudo);
+				write_msg (MSGQID, msg);
+			}
 		}
 	}	
+}
+
+void create_writer (int argc, char** args)
+{
+	if(args[2] == NULL)
+	{
+		printf("You must enter an IP address\n");
+		return;
+	}
+
+	if(args[3] == NULL)
+	{
+		printf("You must enter a number of port\n");
+		return;
+	}
+
+	if(args[4] == NULL)
+	{
+		printf("You must enter a pseudo\n");
+		return;
+	}
+
+	if (strlen (args[4]) >= SIZE_MAX_PSEUDO)
+	{
+		printf ("Pseudo too long\n");
+		return;
+	}
+
+	int sock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+
+	//Définition du serveur
+
+	struct sockaddr_in server;
+	server.sin_family = AF_INET;
+	server.sin_port = htons(atoi (args[3]));
+	inet_aton(args[2], &server.sin_addr);
+
+	//On se connecte au serveur
+	printf("Trying to %s %s\n", args[2], args[3]);
+	if(connect(sock, (struct sockaddr*)&server, sizeof(server)) == -1) 
+	{
+		perror("connect");
+		close(sock);
+		exit (-1);
+	}
+	printf("Connected to %s %s\n", args[2], args[3]);
+
+	char identity [SIZE_MAX_PSEUDO] = {'\0'};
+	sprintf (identity, "W %s", args[4]);
+
+	if (send(sock, identity, sizeof identity, 0) == -1)
+	{
+		perror ("send");
+		exit (-1);
+	}
+
+	char buffer [SIZE_MAX_MSG];
+	if(recv(sock, buffer, sizeof buffer, 0) == -1)
+	{
+		perror ("recv");
+		close (sock);
+		return;
+	}
+
+	if (strcmp(buffer, "Accepted") != 0)
+	{
+		printf ("%s\n", buffer);
+		close (sock);
+		return;
+	}
+
+	while(1)
+	{
+		fgets (buffer, sizeof buffer, stdin);
+
+		if (strcmp (buffer, "exit\n") == 0) {
+			break;
+		}
+
+		if(send(sock, buffer, sizeof buffer, 0) == -1)
+		{
+			perror ("send");
+			exit (-1);
+		}
+	}
+		
+	close(sock);
+}
+
+void create_reader (int argc, char** args)
+{
+	if(args[2] == NULL)
+	{
+		printf("You must enter an IP address\n");
+		return;
+	}
+
+	if(args[3] == NULL)
+	{
+		printf("You must enter a number of port\n");
+		return;
+	}
+
+	 R_SOCKET = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+
+	//On interprète le signal SIGINT (Ctrl+C)
+	struct sigaction exitAction;
+	exitAction.sa_handler = exit_reader;
+	sigaction(SIGINT, &exitAction, NULL);
+	
+	//Définition du serveur
+
+	struct sockaddr_in server;
+	server.sin_family = AF_INET;
+	server.sin_port = htons(atoi (args[3]));
+	inet_aton(args[2], &server.sin_addr);
+
+	//On se connecte au serveur
+	if(connect(R_SOCKET, (struct sockaddr*)&server, sizeof(server)) == -1) {
+		perror("connect");
+		close(R_SOCKET);
+		exit (1);
+	}
+
+	if (send(R_SOCKET, "R", 10, 0) == -1)
+	{
+		perror ("send");
+		exit (1);
+	}
+
+	char buffer[1000] = {'\0'};
+	if(recv(R_SOCKET, buffer, sizeof buffer, 0) == -1)
+	{
+		perror ("recv");
+		close (R_SOCKET);
+		return;
+	}
+
+	if (strcmp(buffer, "Accepted") != 0)
+	{
+		printf ("%s\n", buffer);
+		close (R_SOCKET);
+		return;
+	}
+
+	int i;
+	while(1)
+	{
+		if((i = recv(R_SOCKET, buffer, sizeof buffer, 0)) == -1)
+		{
+			printf ("Server disconnected\n");
+			break;
+		}
+		if (i==0)
+		{
+			break;
+		}
+
+		if (send(R_SOCKET, "Ok", 5, 0) == -1)
+		{
+			perror ("send");
+			close (R_SOCKET);
+			exit (1);
+		}
+
+		printf("%s", buffer);
+	}
+		
+	close(R_SOCKET);
+}
+
+void exit_reader(int sig)
+{
+	printf("Exit client\n");
+	if(send(R_SOCKET, "Disconnect", 15, 0) == -1)
+	{
+		perror("send");
+		exit(1);
+	}
+
+	close(R_SOCKET);
+	exit(0);
+}
+
+void exit_server (int sig) {
+
+	int i;
+	printf ("Server disconnected\n");
+
+	for (i=0; i<(NB_R_MAX + NB_W_MAX); i++)
+	{
+		if (CLIENT_SOCKETS [i] > 0)
+		{
+			close (CLIENT_SOCKETS [i]);
+		}
+	}
+
+	close (SERVER_SOCKET);
+
+	exit (0);
 }
