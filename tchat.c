@@ -11,6 +11,9 @@
 #include <sys/msg.h>
 #include <string.h>
 
+#define NB_R_MAX 5
+#define NB_W_MAX 3
+
 struct message {
 	long type;
 	char buffer [50];
@@ -23,18 +26,17 @@ int create_msg_queue ();
 struct message read_msg (int msgqid, int num_r);
 void write_msg (int msgqid, struct message msg);
 void c_reader (int sock, int num_r);
-void c_writer (int sock);
+void c_writer (int sock, char pseudo []);
 
 int KEY = 1;
 int MSGQID = -1;
 int NB_R = 0;
-int NB_R_MAX = 5;
-int NB_W_MAX = 3;
-int TAB_R_CONNECTED [NB_R_MAX];
+int TAB_R_CONNECTED [NB_R_MAX] = {0};
 
 
 int main (int argc, char *argv []) {
 
+	
 	int sock=-1;
 
 	if ((sock = socket (AF_INET, SOCK_STREAM, 0)) == -1) {
@@ -124,14 +126,29 @@ void *client (void *arg) {
 
 	if (strcmp (msg, "W") == 0)
 	{
-		printf ("Writer connected\n");
-		c_writer (sock);
+		if (recv(sock, msg, sizeof msg, 0) == -1)
+		{
+			perror ("recv");
+			exit (-1);
+		}
+
+		printf ("%s connected\n", msg);
+		c_writer (sock, msg);
 	}
 	else if (strcmp (msg, "R") == 0)
 	{
-		NB_R++;
-		printf ("Reader %d connected\n", NB_R);
-		c_reader (sock, NB_R);
+		int i;
+		for (i=0; i<NB_R_MAX; i++)
+		{
+			if (TAB_R_CONNECTED [i] == 0)
+			{
+				TAB_R_CONNECTED [i] = 1;
+				break;
+			}
+		}
+
+		printf ("Reader %d connected\n", i);
+		c_reader (sock, i);
 	}
 	else
 	{
@@ -223,7 +240,6 @@ printf ("Sending message to client\n");
 void c_reader (int sock, int num_r) {
 
 	struct message msg;
-	int test;
 
 	while (1) {
 		msg = read_msg (MSGQID, num_r);
@@ -246,12 +262,13 @@ void c_reader (int sock, int num_r) {
 		}
 		else
 		{
+			TAB_R_CONNECTED [num_r] = 0;
 			printf ("Reader disconnected\n");
 		}
 	}
 }
 
-void c_writer (int sock) {
+void c_writer (int sock, char pseudo []) {
 
 	struct message msg;
 	int test, i;
