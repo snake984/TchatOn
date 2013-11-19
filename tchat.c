@@ -17,6 +17,7 @@
 struct message {
 	long type;
 	char buffer [50];
+	char pseudo [20];
 }message;
 
 
@@ -134,6 +135,14 @@ void *client (void *arg) {
 	}
 	else if (strcmp (type_client, "R") == 0)
 	{
+		NB_R++;
+
+		if (NB_R > NB_R_MAX) {
+			printf ("Too many Readers\n");
+			close (sock);
+			return NULL;
+		}
+
 		int i;
 		for (i=0; i<NB_R_MAX; i++)
 		{
@@ -144,8 +153,9 @@ void *client (void *arg) {
 			}
 		}
 
-		printf ("Reader %d connected\n", i);
-		c_reader (sock, i);
+		int num_r = i+1;
+		printf ("Reader %d connected\n", num_r);
+		c_reader (sock, num_r);
 	}
 	else
 	{
@@ -212,13 +222,13 @@ int create_msg_queue () {
 
 void write_msg (int msgqid, struct message msg) {
 
-printf ("Message writing : %sType : %ld\n", msg.buffer, msg.type);
+//printf ("Message writing : %sType : %ld\n", msg.buffer, msg.type);
 	if (msgsnd(msgqid, &msg, sizeof msg.buffer, 0) == -1)
 	{
 		perror ("msgsnd");
 		exit (-1);
 	}
-printf ("Done !\n");
+//printf ("Done !\n");
 }
 
 struct message read_msg (int msgqid, int num_r) {
@@ -249,14 +259,17 @@ void c_reader (int sock, int num_r) {
 
 		if(recv(sock, msg.buffer, sizeof msg.buffer, 0) == -1)
 		{
-			printf ("Reader disconnected\n");
+			
+			printf ("Reader %d disconnected\n", num_r);
 			return;
 		}
-printf ("%s\n", msg.buffer);
+
 		if (strcmp(msg.buffer, "Ok") != 0)
 		{
-			TAB_R_CONNECTED [num_r] = 0;
-			printf ("Reader disconnected\n");
+			TAB_R_CONNECTED [num_r-1] = 0;
+			NB_R--;
+			printf ("Reader %d disconnected\n", num_r);
+			return;
 		}
 	}
 }
@@ -285,10 +298,14 @@ void c_writer (int sock, char pseudo []) {
 		{
 			printf ("No client connected\n");
 		}
-
-		for (i=1; i<=NB_R; i++) {
-			msg.type = i;
-			write_msg (MSGQID, msg);
+printf ("NB_R : %d\n", NB_R);
+		for (i=0; i<NB_R; i++) {
+printf ("%d : %d", i+1, TAB_R_CONNECTED [i]);
+			if (TAB_R_CONNECTED [i])
+			{
+				msg.type = i+1;
+				write_msg (MSGQID, msg);
+			}
 		}
 	}	
 }
