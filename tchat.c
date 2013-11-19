@@ -210,7 +210,7 @@ printf ("size : %ld\n", sizeof msg.buffer);
 		exit (2);
 	}
 
-	return message;
+	return msg;
 }
 
 void c_reader (int sock) {
