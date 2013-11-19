@@ -8,7 +8,8 @@
 #include <unistd.h>
 #include <signal.h>
 
-void Exit(int sig, int sock);
+void Exit(int);
+int sock;
 
 
 int main(int argc, char** args)
@@ -25,7 +26,7 @@ int main(int argc, char** args)
 		return 0;
 	}
 
-	int sock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+	 sock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
 
 	//On interprète le signal SIGINT (Ctrl+C)
 	struct sigaction exitAction;
@@ -86,7 +87,7 @@ printf("%s", buffer);
 
 }
 
-void Exit(int sig, int sock)
+void Exit(int sig)
 {
 	printf("Exit client \n");
 	if(send(sock, "Disconnect", 15, 0) == -1)
