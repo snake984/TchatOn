@@ -41,7 +41,7 @@ int create_server () {
 	print_ip (ip);
 
 	struct sockaddr_in addr;
-	inet_aton("127.0.0.1", &addr.sin_addr);
+	inet_aton(ip, &addr.sin_addr);
 	addr.sin_family = AF_INET;
 	addr.sin_port = htons(0);
 	socklen_t sock_len = sizeof addr;
@@ -90,7 +90,7 @@ int create_server () {
 		{
 			pthread_t *t = malloc (sizeof (pthread_t));
 			if (pthread_create(t, NULL, &client,
-					   (void *) &c_sock) 
+					   (void *) &c_sock)
 				!= 0) 
 			{
 				perror ("pthread_create");
@@ -482,7 +482,7 @@ void create_reader (int argc, char** args)
 	struct sigaction exitAction;
 	exitAction.sa_handler = exit_reader;
 	sigaction(SIGINT, &exitAction, NULL);
-	
+
 	//Définition du serveur
 
 	struct sockaddr_in server;
